@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "firebase": {
+      "command": "node",
+      "args": [
+        "C:/Users/heo01/capsule-me-eun/node_modules/firebase-tools/lib/bin/firebase.js",
+        "mcp",
+        "--dir",
+        "C:/Users/heo01/capsule-me-eun"
+      ]
+    }
+  }
+}
