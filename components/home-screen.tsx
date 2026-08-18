@@ -1,58 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { FirebaseError } from "firebase/app";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { useRouter } from "next/navigation";
+import { collection, getCountFromServer, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/components/auth-provider";
-import { Countdown } from "@/components/countdown";
+import { CapsuleField } from "@/components/capsule-field";
 import { SiteHeader } from "@/components/site-header";
-import {
-  formatOpenAt,
-  isCapsuleOpen,
-  parseCapsule,
-  type Capsule,
-} from "@/lib/capsule";
+import { WeatherHero, WeatherScene, useCurrentWeather } from "@/components/weather-scene";
+import { authErrorMessage } from "@/lib/auth-error";
+import { parseCapsule, type Capsule } from "@/lib/capsule";
+import { saveCapsuleDraft } from "@/lib/capsule-draft";
 import { getFirebaseFirestore } from "@/lib/firebase";
-
-function authErrorMessage(error: unknown) {
-  if (
-    error instanceof FirebaseError &&
-    (error.code === "auth/popup-closed-by-user" ||
-      error.code === "auth/cancelled-popup-request")
-  ) {
-    return null;
-  }
-
-  if (error instanceof FirebaseError && error.code === "auth/unauthorized-domain") {
-    return "이 도메인은 Firebase 인증에 허용되지 않았습니다.";
-  }
-
-  return "구글 로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.";
-}
-
-function GoogleMark() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5">
-      <path
-        fill="#4285F4"
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-      />
-    </svg>
-  );
-}
+import { weatherAtmosphere } from "@/lib/weather";
 
 export function HomeScreen() {
   const { user, loading, signInWithGoogle } = useAuth();
@@ -61,6 +21,13 @@ export function HomeScreen() {
   const [capsules, setCapsules] = useState<Capsule[]>([]);
   const [listError, setListError] = useState<string | null>(null);
   const [listLoading, setListLoading] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const currentWeather = useCurrentWeather();
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -78,14 +45,7 @@ export function HomeScreen() {
     const unsubscribe = onSnapshot(
       capsulesQuery,
       (snapshot) => {
-        const next = snapshot.docs
-          .map((doc) => parseCapsule(doc))
-          .sort((left, right) => {
-            const leftTime = left.openAt ? new Date(left.openAt).getTime() : Number.MAX_SAFE_INTEGER;
-            const rightTime = right.openAt ? new Date(right.openAt).getTime() : Number.MAX_SAFE_INTEGER;
-            return leftTime - rightTime;
-          });
-        setCapsules(next);
+        setCapsules(snapshot.docs.map((doc) => parseCapsule(doc)));
         setListError(null);
         setListLoading(false);
       },
@@ -114,127 +74,230 @@ export function HomeScreen() {
 
   if (loading) {
     return (
-      <div className="flex min-h-full flex-1 items-center justify-center bg-gradient-to-b from-amber-50 via-rose-50 to-stone-100">
-        <div className="h-12 w-56 animate-pulse rounded-full bg-stone-200/80" />
+      <div className="relative min-h-full flex-1">
+        <WeatherScene weather={currentWeather.weather} />
+        <div className="relative z-10 flex min-h-full items-center justify-center">
+          <div className="h-12 w-40 animate-pulse rounded-full bg-[#FBF7F0]/70" />
+        </div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="flex min-h-full flex-1 items-center justify-center bg-gradient-to-b from-amber-50 via-rose-50 to-stone-100 px-6 py-16">
-        <main className="w-full max-w-lg rounded-3xl border border-amber-100/80 bg-white/80 px-8 py-16 text-center shadow-xl shadow-amber-900/5 backdrop-blur-sm sm:px-12 sm:py-20">
-          <p className="mb-6 text-xs tracking-[0.35em] text-amber-800/70 uppercase">
-            time capsule
-          </p>
-          <h1 className="text-5xl font-semibold tracking-tight text-stone-800 sm:text-6xl">
-            캡슐 미
-          </h1>
-          <p className="mx-auto mt-6 max-w-sm text-base leading-relaxed text-stone-500">
-            사진과 편지를 묻고, 열람일에 함께 열어요
-          </p>
-          <div className="mt-10 flex flex-col items-center gap-3">
+      <GuestLanding
+        weather={currentWeather.weather}
+        weatherStatus={currentWeather.status}
+        pending={pending}
+        error={error}
+        onGoogleSignIn={() => void handleGoogleSignIn()}
+      />
+    );
+  }
+
+  const air = weatherAtmosphere(currentWeather.weather);
+
+  return (
+    <div className="relative min-h-full flex-1">
+      <WeatherScene weather={currentWeather.weather} />
+      <div className="relative z-10 mx-auto w-full max-w-xl pb-28">
+        <SiteHeader />
+        <main className="px-5">
+          <header className="text-center">
+            <p
+              className="text-[11px] tracking-[0.28em] uppercase"
+              style={{ color: air.muted }}
+            >
+              capsule me
+            </p>
+            <h1
+              className="mt-2 font-serif text-4xl tracking-tight"
+              style={{ color: air.ink }}
+            >
+              내 캡슐
+            </h1>
+            <p className="mt-2 text-sm" style={{ color: air.muted }}>
+              {capsules.length}개의 기억
+            </p>
+          </header>
+
+          <div className="mt-8">
+            <WeatherHero
+              weather={currentWeather.weather}
+              status={currentWeather.status}
+            />
+          </div>
+
+          {listError ? (
+            <p className="pt-4 text-center text-sm text-rose-600">{listError}</p>
+          ) : null}
+
+          {listLoading ? (
+            <p className="pt-16 text-center text-sm" style={{ color: air.muted }}>
+              불러오는 중
+            </p>
+          ) : null}
+
+          {!listLoading && capsules.length === 0 ? (
+            <div className="pt-16 text-center">
+              <p style={{ color: air.ink }}>아직 묻은 캡슐이 없어요</p>
+              <Link
+                href="/new"
+                className="mt-4 inline-block text-sm underline decoration-stone-400 underline-offset-4"
+                style={{ color: air.muted }}
+              >
+                첫 캡슐 묻기
+              </Link>
+            </div>
+          ) : null}
+
+          {!listLoading && capsules.length > 0 ? (
+            <div className="mt-12">
+              <CapsuleField capsules={capsules} now={now} />
+            </div>
+          ) : null}
+        </main>
+      </div>
+
+      <Link
+        href="/new"
+        className="fixed bottom-6 left-1/2 z-20 -translate-x-1/2 rounded-full bg-stone-900 px-7 py-3 text-sm font-medium text-[#FBF7F0] shadow-lg"
+      >
+        새 캡슐
+      </Link>
+    </div>
+  );
+}
+
+function GuestLanding({
+  weather,
+  weatherStatus,
+  pending,
+  error,
+  onGoogleSignIn,
+}: {
+  weather: ReturnType<typeof useCurrentWeather>["weather"];
+  weatherStatus: ReturnType<typeof useCurrentWeather>["status"];
+  pending: boolean;
+  error: string | null;
+  onGoogleSignIn: () => void;
+}) {
+  const router = useRouter();
+  const [to, setTo] = useState("");
+  const [letter, setLetter] = useState("");
+  const [totalCapsules, setTotalCapsules] = useState<number | null>(null);
+  const air = weatherAtmosphere(weather);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getCountFromServer(collection(getFirebaseFirestore(), "capsules"))
+      .then((snapshot) => {
+        if (!cancelled) {
+          setTotalCapsules(snapshot.data().count);
+        }
+      })
+      .catch((caught) => {
+        console.error(caught);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleStart(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    saveCapsuleDraft({ to, letter, openAt: "" });
+    router.push("/new");
+  }
+
+  return (
+    <div className="relative min-h-full flex-1">
+      <WeatherScene weather={weather} />
+      <div className="relative z-10 mx-auto w-full max-w-xl">
+        <SiteHeader />
+        <main className="px-5 pb-16">
+          <header className="text-center">
+            <p
+              className="text-[11px] tracking-[0.28em] uppercase"
+              style={{ color: air.muted }}
+            >
+              capsule me
+            </p>
+            <h1
+              className="mt-2 font-serif text-5xl tracking-tight"
+              style={{ color: air.ink }}
+            >
+              캡슐 미
+            </h1>
+            <p
+              className="mx-auto mt-3 max-w-xs text-sm leading-relaxed"
+              style={{ color: air.muted }}
+            >
+              사진과 편지를 묻고, 열람일에 함께 열어요
+            </p>
+            <p className="mt-4 text-sm" style={{ color: air.ink }}>
+              {totalCapsules == null ? (
+                <span className="inline-block h-5 w-36 animate-pulse rounded-full bg-[#FBF7F0]/70 align-middle" />
+              ) : totalCapsules === 0 ? (
+                "아직 묻힌 캡슐이 없어요"
+              ) : (
+                <>지금까지 {totalCapsules.toLocaleString("ko-KR")}개의 캡슐</>
+              )}
+            </p>
+          </header>
+
+          <div className="mt-8">
+            <WeatherHero weather={weather} status={weatherStatus} />
+          </div>
+
+          <form className="mt-8 flex flex-col gap-4" onSubmit={handleStart}>
+            <div className="rounded-[1.75rem] bg-[#FBF7F0]/88 px-5 py-5 shadow-sm">
+              <label className="flex flex-col gap-2 text-sm text-stone-600">
+                누구에게
+                <input
+                  type="text"
+                  value={to}
+                  onChange={(event) => setTo(event.target.value)}
+                  placeholder="미래의 나, 친구, 가족"
+                  className="rounded-xl border border-stone-200/80 bg-white px-3 py-2.5 text-stone-800"
+                />
+              </label>
+              <label className="mt-4 flex flex-col gap-2 text-sm text-stone-600">
+                편지
+                <textarea
+                  value={letter}
+                  onChange={(event) => setLetter(event.target.value)}
+                  rows={4}
+                  placeholder="오늘을 남겨 두어요"
+                  className="rounded-xl border border-stone-200/80 bg-white px-3 py-2.5 text-stone-800"
+                />
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              className="rounded-full bg-stone-900 px-8 py-3.5 text-sm font-medium text-[#FBF7F0]"
+            >
+              캡슐 묻기
+            </button>
+          </form>
+
+          <div className="mt-6 flex flex-col items-center gap-2">
             <button
               type="button"
-              onClick={() => void handleGoogleSignIn()}
+              onClick={onGoogleSignIn}
               disabled={pending}
-              className="inline-flex items-center justify-center gap-3 rounded-full border border-stone-200 bg-white px-7 py-3.5 text-sm font-medium tracking-wide text-stone-700 shadow-md shadow-stone-900/5 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-70"
+              className="text-sm opacity-70 transition hover:opacity-100 disabled:opacity-50"
+              style={{ color: air.ink }}
             >
-              <GoogleMark />
-              {pending ? "로그인 중..." : "Google로 시작하기"}
+              {pending ? "로그인 중..." : "이미 묻은 캡슐이 있다면 Google로 보기"}
             </button>
             {error ? <p className="text-sm text-rose-600">{error}</p> : null}
           </div>
         </main>
       </div>
-    );
-  }
-
-  const openCount = capsules.filter((capsule) => isCapsuleOpen(capsule.openAt)).length;
-  const sealedCount = capsules.length - openCount;
-
-  return (
-    <div className="min-h-full flex-1 bg-gradient-to-b from-amber-50 via-rose-50 to-stone-100">
-      <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl px-6 pb-16">
-        <div className="flex flex-wrap items-end justify-between gap-4 pt-4">
-          <div>
-            <p className="text-xs tracking-[0.35em] text-amber-800/70 uppercase">
-              dashboard
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-800">
-              내 캡슐
-            </h1>
-            <p className="mt-2 text-sm text-stone-500">
-              묻힌 캡슐 {capsules.length}개 · 봉인 {sealedCount}개 · 열람 {openCount}개
-            </p>
-          </div>
-          <Link
-            href="/new"
-            className="inline-flex items-center justify-center rounded-full bg-stone-800 px-6 py-3 text-sm font-medium text-amber-50"
-          >
-            캡슐 묻기
-          </Link>
-        </div>
-
-        {listError ? <p className="mt-6 text-sm text-rose-600">{listError}</p> : null}
-
-        {listLoading ? (
-          <div className="mt-8 grid gap-4">
-            <div className="h-28 animate-pulse rounded-3xl bg-white/70" />
-            <div className="h-28 animate-pulse rounded-3xl bg-white/70" />
-          </div>
-        ) : null}
-
-        {!listLoading && capsules.length === 0 ? (
-          <div className="mt-10 rounded-3xl border border-amber-100 bg-white/80 px-8 py-14 text-center">
-            <p className="text-stone-600">아직 묻은 캡슐이 없어요</p>
-            <Link href="/new" className="mt-4 inline-block text-sm text-amber-800">
-              첫 캡슐 묻으러 가기
-            </Link>
-          </div>
-        ) : null}
-
-        <ul className="mt-8 grid gap-4">
-          {capsules.map((capsule) => {
-            const open = isCapsuleOpen(capsule.openAt);
-            const cover = capsule.imageUrls[0];
-
-            return (
-              <li key={capsule.id}>
-                <Link
-                  href={`/capsule/${capsule.id}`}
-                  className="flex gap-4 rounded-3xl border border-amber-100/80 bg-white/80 p-4 shadow-sm transition hover:bg-white"
-                >
-                  {cover ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={cover}
-                      alt=""
-                      className={`h-24 w-24 shrink-0 rounded-2xl object-cover ${open ? "" : "blur-sm"}`}
-                    />
-                  ) : (
-                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-xs text-amber-800">
-                      편지
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-stone-800">
-                      {capsule.to ? `${capsule.to}에게` : "이름 없는 캡슐"}
-                    </p>
-                    <p className="mt-1 text-sm text-stone-400">
-                      {formatOpenAt(capsule.openAt)}
-                    </p>
-                    <div className="mt-3">
-                      <Countdown openAt={capsule.openAt} />
-                    </div>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </main>
     </div>
   );
 }

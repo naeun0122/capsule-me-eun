@@ -1,17 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { IBM_Plex_Sans_KR, Noto_Serif_KR } from "next/font/google";
 import { FirebaseAnalytics } from "@/components/firebase-analytics";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sans = IBM_Plex_Sans_KR({
+  weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
+  variable: "--font-ibm-plex-sans-kr",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const serif = Noto_Serif_KR({
+  weight: ["500", "600", "700"],
   subsets: ["latin"],
+  variable: "--font-noto-serif-kr",
 });
 
 export const metadata: Metadata = {
@@ -22,10 +24,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      lang="ko"
+      className={`${sans.variable} ${serif.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full flex-col font-sans">
         <Providers>
           <FirebaseAnalytics />
           {children}

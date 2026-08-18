@@ -7,31 +7,45 @@ import { useAuth } from "@/components/auth-provider";
 import { Countdown } from "@/components/countdown";
 import { SiteHeader } from "@/components/site-header";
 import {
+  KeywordPills,
+  WeatherCapsuleVisual,
+} from "@/components/weather-capsule";
+import { WeatherMark } from "@/components/weather-mark";
+import { WeatherScene } from "@/components/weather-scene";
+import {
   formatOpenAt,
   isCapsuleOpen,
   parseCapsule,
   type Capsule,
 } from "@/lib/capsule";
 import { getFirebaseFirestore } from "@/lib/firebase";
+import { weatherKind } from "@/lib/weather";
 
 const isDev = process.env.NODE_ENV === "development";
 
 function CapsuleContents({ capsule }: { capsule: Capsule }) {
   return (
-    <div className="mt-8 rounded-3xl border border-amber-100/80 bg-white/80 px-6 py-8 shadow-sm sm:px-8">
-      <p className="text-xs tracking-[0.3em] text-amber-800/60 uppercase">letter</p>
-      <p className="mt-4 whitespace-pre-wrap text-lg leading-relaxed text-stone-700">
+    <div className="mt-8 rounded-[1.75rem] bg-[#FBF7F0]/88 px-6 py-8 shadow-sm sm:px-8">
+      {capsule.mood ? (
+        <p className="text-center text-base leading-relaxed text-stone-600">
+          {capsule.mood.phrase}
+        </p>
+      ) : null}
+      <p className="mt-6 text-center text-[11px] tracking-[0.28em] text-stone-400 uppercase">
+        letter
+      </p>
+      <p className="mt-4 whitespace-pre-wrap text-center text-lg leading-relaxed text-stone-700">
         {capsule.letter || "편지가 비어 있어요"}
       </p>
       {capsule.imageUrls.length > 0 ? (
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
           {capsule.imageUrls.map((url) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               key={url}
               src={url}
               alt=""
-              className="h-44 w-44 rounded-3xl object-cover shadow-sm"
+              className="h-44 w-44 rounded-2xl object-cover shadow-sm"
             />
           ))}
         </div>
@@ -79,87 +93,113 @@ export default function CapsulePage({
   const revealed = open || (isDev && devPreview);
 
   return (
-    <div className="min-h-full flex-1 bg-gradient-to-b from-amber-50 via-rose-50 to-stone-100">
+    <div className="relative min-h-full flex-1">
+      <WeatherScene weather={capsule?.weather ?? null} />
+      <div className="relative z-10">
       <SiteHeader />
-      <main className="mx-auto w-full max-w-2xl px-6 pb-16">
+      <main className="mx-auto w-full max-w-xl px-5 pb-16">
         {loading || status === "loading" ? (
-          <div className="mt-10 h-64 animate-pulse rounded-3xl bg-white/70" />
+          <div className="mt-10 h-64 animate-pulse rounded-[1.75rem] bg-[#FBF7F0]/70" />
         ) : null}
 
         {status === "missing" ? (
-          <div className="mt-10 rounded-3xl bg-white/80 px-8 py-12 text-center">
+          <div className="mt-10 rounded-[1.75rem] bg-[#FBF7F0]/88 px-8 py-12 text-center">
             <p className="text-stone-600">캡슐을 찾을 수 없어요</p>
-            <Link href="/" className="mt-4 inline-block text-sm text-amber-800">
-              대시보드로
+            <Link href="/" className="mt-4 inline-block text-sm text-stone-500">
+              내 캡슐로
             </Link>
           </div>
         ) : null}
 
         {status === "ready" && capsule && !user ? (
-          <div className="mt-10 rounded-3xl bg-white/80 px-8 py-12 text-center">
+          <div className="mt-10 rounded-[1.75rem] bg-[#FBF7F0]/88 px-8 py-12 text-center">
             <p className="text-stone-600">캡슐을 보려면 로그인해 주세요</p>
-            <Link href="/" className="mt-4 inline-block text-sm text-amber-800">
+            <Link href="/" className="mt-4 inline-block text-sm text-stone-500">
               홈으로
             </Link>
           </div>
         ) : null}
 
         {status === "ready" && capsule && user && !isOwner ? (
-          <div className="mt-10 rounded-3xl bg-white/80 px-8 py-12 text-center">
+          <div className="mt-10 rounded-[1.75rem] bg-[#FBF7F0]/88 px-8 py-12 text-center">
             <p className="text-stone-600">이 캡슐은 다른 사람의 것입니다</p>
-            <Link href="/" className="mt-4 inline-block text-sm text-amber-800">
-              대시보드로
+            <Link href="/" className="mt-4 inline-block text-sm text-stone-500">
+              내 캡슐로
             </Link>
           </div>
         ) : null}
 
         {status === "ready" && capsule && isOwner ? (
-          <article className="mt-4">
+          <article className="mt-2">
             <Link href="/" className="text-sm text-stone-400 hover:text-stone-600">
-              ← 대시보드
+              ← 내 캡슐
             </Link>
 
-            <div className="relative mt-6 overflow-hidden rounded-[2rem] border border-amber-100/80 bg-white/70 shadow-xl shadow-amber-900/5">
-              {capsule.imageUrls[0] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={capsule.imageUrls[0]}
-                  alt=""
-                  className={`h-56 w-full object-cover sm:h-72 ${revealed ? "" : "scale-105 blur-md"}`}
-                />
-              ) : (
-                <div className="flex h-56 items-center justify-center bg-gradient-to-br from-amber-100 to-rose-100 sm:h-72">
-                  <span className="text-sm tracking-[0.4em] text-amber-800/50 uppercase">
-                    sealed
+            <div className="relative mt-6 overflow-hidden rounded-[1.75rem] bg-[#FBF7F0]/88 px-6 pb-8 pt-10 text-center shadow-sm">
+              <div className="flex justify-center">
+                {capsule.mood ? (
+                  <WeatherCapsuleVisual mood={capsule.mood} size="lg" floating />
+                ) : capsule.imageUrls[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={capsule.imageUrls[0]}
+                    alt=""
+                    className={`h-44 w-44 rounded-2xl object-cover ${revealed ? "" : "blur-md"}`}
+                  />
+                ) : (
+                  <div className="flex h-44 w-44 items-center justify-center rounded-2xl bg-amber-50">
+                    <span className="text-sm text-stone-400">봉인</span>
+                  </div>
+                )}
+              </div>
+              {capsule.weather ? (
+                <div className="mt-5 flex items-center justify-center gap-2 text-sm text-stone-600">
+                  <WeatherMark kind={weatherKind(capsule.weather)} size="sm" />
+                  <span>
+                    {capsule.weather.sky}
+                    {capsule.weather.temperature != null
+                      ? ` ${capsule.weather.temperature}°`
+                      : ""}
+                    {capsule.weather.place ? ` · ${capsule.weather.place}` : ""}
                   </span>
                 </div>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-stone-900/55 via-stone-900/10 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 px-6 pb-6 text-white">
-                <p className="text-xs tracking-[0.35em] text-white/70 uppercase">
-                  capsule
+              ) : null}
+              <p className="mt-5 text-[11px] tracking-[0.28em] text-stone-400 uppercase">
+                {capsule.mood?.name ?? "capsule"}
+              </p>
+              <h1 className="mt-2 font-serif text-3xl tracking-tight text-stone-800">
+                {capsule.to ? `${capsule.to}에게` : "이름 없는 캡슐"}
+              </h1>
+              <p className="mt-2 text-sm text-stone-500">
+                {formatOpenAt(capsule.openAt)}
+              </p>
+              {capsule.mood?.keywords.length ? (
+                <KeywordPills
+                  keywords={capsule.mood.keywords}
+                  className="mt-5 justify-center"
+                />
+              ) : null}
+              {!revealed && capsule.mood ? (
+                <p className="mx-auto mt-5 max-w-sm text-sm leading-relaxed text-stone-500">
+                  {capsule.mood.phrase}
                 </p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-                  {capsule.to ? `${capsule.to}에게` : "이름 없는 캡슐"}
-                </h1>
-                <p className="mt-2 text-sm text-white/75">{formatOpenAt(capsule.openAt)}</p>
-              </div>
+              ) : null}
             </div>
 
             {revealed ? (
               <>
                 {isDev && devPreview && !open ? (
-                  <p className="mt-4 text-center text-xs text-stone-400">
+                  <p className="mt-4 text-center text-xs text-stone-500">
                     개발 미리보기 · 실제 열람일은 아직 남았습니다
                   </p>
                 ) : null}
                 <CapsuleContents capsule={capsule} />
               </>
             ) : (
-              <div className="mt-8 rounded-[2rem] border border-dashed border-amber-200 bg-white/60 px-6 py-12 text-center">
-                <p className="text-lg font-medium text-stone-700">아직 기간이 남았어요</p>
+              <div className="mt-8 rounded-[1.75rem] bg-[#FBF7F0]/88 px-6 py-12 text-center shadow-sm">
+                <p className="font-serif text-xl text-stone-800">아직 열 수 없어요</p>
                 <p className="mt-2 text-sm text-stone-400">
-                  열람일이 되어야 편지와 사진을 볼 수 있어요
+                  열람일이 되면 편지와 사진을 볼 수 있어요
                 </p>
                 <div className="mt-6 text-2xl">
                   <Countdown openAt={capsule.openAt} />
@@ -179,6 +219,7 @@ export default function CapsulePage({
           </article>
         ) : null}
       </main>
+      </div>
     </div>
   );
 }
