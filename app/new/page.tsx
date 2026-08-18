@@ -15,6 +15,7 @@ import { clearCapsuleDraft, readCapsuleDraft } from "@/lib/capsule-draft";
 import { parseCapsuleMood, type CapsuleMood } from "@/lib/capsule-mood";
 import { getFirebaseFirestore, getFirebaseStorage } from "@/lib/firebase";
 import { requestCapsuleWeather, type CapsuleWeather } from "@/lib/weather";
+import { trackEvent } from "@/lib/ga";
 
 function fileExtension(file: File) {
   const mimeSubtype = file.type.split("/")[1]?.split("+")[0];
@@ -174,6 +175,10 @@ function NewCapsuleForm() {
         to,
         imageCount: images.length,
         mood,
+      });
+      trackEvent("capsule_bury", {
+        image_count: images.length,
+        has_open_at: Boolean(openAt),
       });
     } catch (caught) {
       console.error(caught);

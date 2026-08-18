@@ -16,6 +16,7 @@ import {
   type User,
 } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
+import { trackEvent } from "@/lib/ga";
 
 type AuthContextValue = {
   user: User | null;
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: "select_account" });
         const result = await signInWithPopup(getFirebaseAuth(), provider);
+        trackEvent("login", { method: "google" });
         return result.user;
       },
       async signOut() {
