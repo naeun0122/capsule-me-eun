@@ -20,7 +20,7 @@ import { getFirebaseAuth } from "@/lib/firebase";
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: () => Promise<User>;
   signOut: () => Promise<void>;
 };
 
@@ -49,7 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async signInWithGoogle() {
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: "select_account" });
-        await signInWithPopup(getFirebaseAuth(), provider);
+        const result = await signInWithPopup(getFirebaseAuth(), provider);
+        return result.user;
       },
       async signOut() {
         await firebaseSignOut(getFirebaseAuth());
